@@ -1,0 +1,1 @@
+import{I as e}from"./index-CCK6s6H7.js";function a(t){return e.get("/audit/todo",{params:t})}function r(t){return e.put("/audit/pass",t)}function i(t){return e.put("/audit/reject",t)}function o(t){return e.get("/audit/record/page",{params:t})}export{r as a,i as b,o as c,a as g};

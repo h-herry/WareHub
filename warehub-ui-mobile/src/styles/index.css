@@ -1,0 +1,90 @@
+:root {
+  /* 仓枢 WareHub 视觉规范 */
+  --wh-primary: #4f5bd5;
+  --wh-primary-gradient: linear-gradient(135deg, #4f5bd5, #16b5d3);
+  --wh-success: #00b42a;
+  --wh-warning: #ff7d00;
+  --wh-danger: #f53f3f;
+  --wh-cyan: #0fc6c2;
+
+  --wh-text-1: #1f2329;
+  --wh-text-2: #4e5969;
+  --wh-text-3: #86909c;
+  --wh-bg: #f7f8fa;
+  --wh-card: #ffffff;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--wh-bg);
+  color: var(--wh-text-1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica,
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  max-width: 750px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--wh-bg);
+  position: relative;
+}
+
+/* 主色按钮渐变 */
+.wh-gradient-btn {
+  background: var(--wh-primary-gradient) !important;
+  border: none !important;
+  color: #fff !important;
+}
+
+/* 顶部品牌渐变条 */
+.wh-header-gradient {
+  background: var(--wh-primary-gradient);
+  color: #fff;
+}
+
+/* 卡片通用 */
+.wh-card {
+  background: var(--wh-card);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 12px;
+  box-shadow: 0 2px 12px rgba(31, 35, 41, 0.04);
+}
+
+/* 区块标题 */
+.wh-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--wh-text-1);
+  margin: 4px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wh-section-title::before {
+  content: '';
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--wh-primary-gradient);
+}
+
+.wh-text-3 {
+  color: var(--wh-text-3);
+}
+
+.wh-text-2 {
+  color: var(--wh-text-2);
+}

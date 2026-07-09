@@ -1,0 +1,44 @@
+# 仓枢 WareHub 一键编排：应用 + MySQL
+# 用法：
+#   1) 先构建后端单 JAR（含前端静态资源）：
+#      cd warehub-api && mvn clean package -DskipTests
+#      cp target/warehub-api-1.0.0.jar ../docker/warehub.jar
+#   2) docker compose up -d
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: warehub-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: warehub
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+
+  app:
+    image: warehub:1.0
+    container_name: warehub-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USERNAME: root
+      DB_PASSWORD: root
+    volumes:
+      - app-data:/data
+
+volumes:
+  mysql-data:
+  app-data:

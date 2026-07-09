@@ -1,0 +1,11 @@
+// 统一导出 API 模块
+export * as authApi from './auth'
+export * as materialApi from './material'
+export * as stockApi from './stock'
+export * as inboundApi from './inbound'
+export * as outboundApi from './outbound'
+export * as transferApi from './transfer'
+export * as stocktakeApi from './stocktake'
+export * as auditApi from './audit'
+export * as warehouseApi from './warehouse'
+export * as dashboardApi from './dashboard'

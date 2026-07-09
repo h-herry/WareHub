@@ -1,0 +1,142 @@
+:root {
+  /* 主色 */
+  --wh-primary: #4f5bd5;
+  --wh-primary-light: #6b76df;
+  --wh-primary-dark: #3a38c9;
+  --wh-primary-gradient: linear-gradient(135deg, #4f5bd5 0%, #16b5d3 100%);
+
+  /* 功能色 */
+  --wh-success: #00b42a;
+  --wh-success-bg: #e8ffea;
+  --wh-warning: #ff7d00;
+  --wh-warning-bg: #fff7e8;
+  --wh-danger: #f53f3f;
+  --wh-danger-bg: #ffece8;
+  --wh-cyan: #0fc6c2;
+
+  /* 文字 */
+  --wh-text-primary: #1f2329;
+  --wh-text-regular: #4e5969;
+  --wh-text-secondary: #86909c;
+
+  /* 边框与背景 */
+  --wh-border: #e5e6eb;
+  --wh-card-bg: #ffffff;
+  --wh-page-bg: #f7f8fa;
+
+  /* 侧边栏 */
+  --wh-sidebar-bg: #1f2330;
+  --wh-sidebar-active: #4f5bd5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+  color: var(--wh-text-primary);
+  background-color: var(--wh-page-bg);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  text-decoration: none;
+  color: var(--wh-primary);
+}
+
+.wh-gradient-text {
+  background: var(--wh-primary-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.wh-page {
+  padding: 16px;
+}
+
+.wh-card {
+  background: var(--wh-card-bg);
+  border-radius: 8px;
+  border: 1px solid var(--wh-border);
+}
+
+.wh-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.wh-toolbar .wh-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wh-page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--wh-text-primary);
+  margin: 0 0 4px;
+}
+
+.wh-page-subtitle {
+  font-size: 13px;
+  color: var(--wh-text-secondary);
+  margin: 0;
+}
+
+.wh-section {
+  margin-bottom: 16px;
+}
+
+/* 表格空态占位 */
+.wh-empty {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--wh-text-secondary);
+}
+
+/* 状态标签统一圆角 */
+.el-tag {
+  border-radius: 4px;
+}
+
+/* 主按钮渐变 */
+.el-button--primary {
+  --el-button-bg-color: var(--wh-primary);
+  --el-button-border-color: var(--wh-primary);
+  --el-button-hover-bg-color: var(--wh-primary-light);
+  --el-button-hover-border-color: var(--wh-primary-light);
+  --el-button-active-bg-color: var(--wh-primary-dark);
+  --el-button-active-border-color: var(--wh-primary-dark);
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d7de;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c0c4cc;
+}

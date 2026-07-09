@@ -1,0 +1,109 @@
+# 仓枢 WareHub - 主配置文件（生产环境 MySQL）
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: warehub
+  profiles:
+    active: prod
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/warehub?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root123321}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      connection-timeout: 30000
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.warehub.entity
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.warehub: DEBUG
+    org.springframework.security: DEBUG
+  file:
+    name: ./logs/warehub.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
+
+# WareHub 业务配置
+warehub:
+  # CORS 白名单（逗号分隔），缺失时回退到仅 http://localhost:8080
+  cors:
+    allowed-origins: "http://localhost:8080,http://localhost:5173"
+  # JWT 配置
+  jwt:
+    secret: ${JWT_SECRET}
+    access-token-expiration: 7200000        # 2 小时
+    refresh-token-expiration: 604800000     # 7 天
+  # 审核配置开关
+  audit:
+    inbound: true       # 入库是否需要审核
+    outbound: true      # 出库是否需要审核
+    transfer: false     # 调拨免审核
+    stocktake: true     # 盘点是否需要审核
+  # 单据编号前缀配置
+  code-rule:
+    inbound-prefix: IN
+    outbound-prefix: OUT
+    transfer-prefix: TR
+    stocktake-prefix: PD
+  # 物料编码规则
+  material-code:
+    type-codes:
+      RAW: "RAW"        # 原材料
+      SEM: "SEM"        # 半成品
+      FIN: "FIN"        # 成品
+      AUX: "AUX"        # 辅料
+
+# SpringDoc OpenAPI 配置
+springdoc:
+  api-docs:
+    path: /api-docs
+    enabled: true
+  swagger-ui:
+    path: /doc.html
+    enabled: true
+  info:
+    title: 仓枢 WareHub API
+    description: 轻量化仓库管理系统接口文档
+    version: 1.0.0
+
+# 端点暴露（Actuator）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
