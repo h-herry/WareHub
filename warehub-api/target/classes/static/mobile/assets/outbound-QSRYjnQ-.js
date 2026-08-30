@@ -1,1 +1,0 @@
-import{v as t}from"./index-DomDvkLp.js";function e(u){return t.post("/outbound",u)}function n(u){return t.put(`/outbound/submit/${u}`)}function r(u){return t.put(`/outbound/execute/${u}`)}export{e as c,r as e,n as s};

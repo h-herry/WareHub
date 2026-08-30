@@ -40,6 +40,13 @@ public class InboundServiceImpl implements InboundService {
     @org.springframework.beans.factory.annotation.Value("${warehub.audit.inbound:true}")
     private boolean auditRequired;
 
+    /**
+     * 创建入库单（草稿状态）
+     * <p>自动生成单号，保存主单与明细，汇总计划数量写入总数量。</p>
+     *
+     * @param dto 入库单创建请求（含仓库、明细）
+     * @return 生成的入库单号
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String createInbound(InboundCreateDTO dto) {
@@ -67,6 +74,12 @@ public class InboundServiceImpl implements InboundService {
         return order.getOrderNo();
     }
 
+    /**
+     * 提交入库单：草稿 → 待审核（或审核关闭时直接待入库）
+     *
+     * @param orderNo 入库单号或 ID
+     * @return 提交后的状态
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String submit(String orderNo) {
@@ -82,6 +95,11 @@ public class InboundServiceImpl implements InboundService {
         return status;
     }
 
+    /**
+     * 执行入库：校验状态为待入库后逐明细增加库存并写流水，单据置为已完成
+     *
+     * @param orderNo 入库单号或 ID
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void execute(String orderNo) {
@@ -102,6 +120,7 @@ public class InboundServiceImpl implements InboundService {
         orderMapper.updateById(order);
     }
 
+    /** 入库单分页查询（按状态/单号/仓库筛选），附带仓库名与明细（含物料名） */
     @Override
     public PageResult<Map<String, Object>> page(int pageNum, int pageSize, String status, String orderNo, Long warehouseId) {
         LambdaQueryWrapper<InboundOrder> qw = new LambdaQueryWrapper<>();

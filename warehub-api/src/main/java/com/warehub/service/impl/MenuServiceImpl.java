@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements MenuService {
 
+    /** 菜单权限树（按 sort 升序，递归组装 children，含菜单与按钮两类节点） */
     @Override
     public List<Map<String, Object>> tree() {
         List<Menu> all = list(new LambdaQueryWrapper<Menu>().orderByAsc(Menu::getSort));

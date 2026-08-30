@@ -31,4 +31,6 @@ warehub:
     allowed-origins: "http://localhost:8080,http://localhost:5173"
   # JWT 配置
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:warehub-demo-jwt-secret-key-2026-min32bytes-long-safe}
+  security:
+    default-password: "admin123"

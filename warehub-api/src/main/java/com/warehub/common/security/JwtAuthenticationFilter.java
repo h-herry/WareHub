@@ -72,6 +72,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(bearer) && bearer.startsWith(TOKEN_PREFIX)) {
             return bearer.substring(TOKEN_PREFIX.length());
         }
+        // 兼容 SSE（EventSource 无法设置 Header）：允许通过 ?token= 传参
+        String param = request.getParameter("token");
+        if (StringUtils.hasText(param)) {
+            return param;
+        }
         return null;
     }
 }

@@ -1,1 +1,0 @@
-import{v as e}from"./index-DomDvkLp.js";function n(r){return e.post("/transfer",r)}function s(r){return e.put(`/transfer/submit/${r}`)}function u(r){return e.put(`/transfer/execute/${r}`)}export{n as c,u as e,s};

@@ -40,6 +40,13 @@ public class TransferServiceImpl implements TransferService {
     @org.springframework.beans.factory.annotation.Value("${warehub.audit.transfer:false}")
     private boolean auditRequired;
 
+    /**
+     * 创建调拨单（草稿状态）
+     * <p>校验调出/调入位置不同，明细以 JSON 序列化存储。</p>
+     *
+     * @param dto 调拨单创建请求
+     * @return 生成的调拨单号
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String createTransfer(TransferCreateDTO dto) {
@@ -71,6 +78,12 @@ public class TransferServiceImpl implements TransferService {
         return order.getOrderNo();
     }
 
+    /**
+     * 提交调拨单：先校验源仓库库存充足，再草稿 → 待审核（或审核关闭时直接待执行）
+     *
+     * @param orderNo 调拨单号或 ID
+     * @return 提交后的状态
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String submit(String orderNo) {
@@ -94,6 +107,11 @@ public class TransferServiceImpl implements TransferService {
         return status;
     }
 
+    /**
+     * 执行调拨：源仓库扣减、目标仓库增加库存，分别记录出入流水，单据置为已完成
+     *
+     * @param orderNo 调拨单号或 ID
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void execute(String orderNo) {
@@ -136,8 +154,10 @@ public class TransferServiceImpl implements TransferService {
                     .eq(Stock::getWarehouseId, order.getFromWarehouseId())
                     .eq(Stock::getMaterialId, materialId)
                     .gt(Stock::getQuantity, BigDecimal.ZERO);
+            // 可用量 = 总量 - 锁定量，避免把已被占用的库存调出（P0-3 调拨源校验）
             BigDecimal available = stockMapper.selectList(sq).stream()
-                    .map(Stock::getQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
+                    .map(s -> s.getQuantity().subtract(s.getLockedQuantity() != null ? s.getLockedQuantity() : BigDecimal.ZERO))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
             if (available.compareTo(need) < 0) {
                 String matName = Optional.ofNullable(materialMapper.selectById(materialId))
                         .map(Material::getMaterialName).orElse("物料ID=" + materialId);
@@ -150,6 +170,7 @@ public class TransferServiceImpl implements TransferService {
         }
     }
 
+    /** 调拨单分页查询（按状态/单号/仓库筛选，仓库同时匹配调出与调入），附带双方仓库名与明细 */
     @Override
     public PageResult<Map<String, Object>> page(int pageNum, int pageSize, String status, String orderNo, Long warehouseId) {
         LambdaQueryWrapper<TransferOrder> qw = new LambdaQueryWrapper<>();

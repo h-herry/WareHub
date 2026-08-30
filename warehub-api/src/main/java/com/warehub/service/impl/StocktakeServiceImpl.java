@@ -39,6 +39,13 @@ public class StocktakeServiceImpl implements StocktakeService {
     @org.springframework.beans.factory.annotation.Value("${warehub.audit.stocktake:true}")
     private boolean auditRequired;
 
+    /**
+     * 创建盘点单（草稿状态）
+     * <p>未填写账面数量时自动取当前库存，实盘缺省等于账面；明细以 JSON 序列化存储。</p>
+     *
+     * @param dto 盘点单创建请求
+     * @return 生成的盘点单号
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String createStocktake(StocktakeCreateDTO dto) {
@@ -75,6 +82,12 @@ public class StocktakeServiceImpl implements StocktakeService {
         return order.getOrderNo();
     }
 
+    /**
+     * 提交盘点单：草稿 → 待审核（或审核关闭时直接待执行）
+     *
+     * @param orderNo 盘点单号或 ID
+     * @return 提交后的状态
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String submit(String orderNo) {
@@ -90,6 +103,11 @@ public class StocktakeServiceImpl implements StocktakeService {
         return status;
     }
 
+    /**
+     * 执行盘点：逐明细将库存调整为实盘数量（差异自动入账流水），单据置为已完成
+     *
+     * @param orderNo 盘点单号或 ID
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void execute(String orderNo) {
@@ -115,6 +133,7 @@ public class StocktakeServiceImpl implements StocktakeService {
         orderMapper.updateById(order);
     }
 
+    /** 盘点单分页查询（按状态/单号/仓库筛选），附带仓库名与 JSON 明细解析 */
     @Override
     public PageResult<Map<String, Object>> page(int pageNum, int pageSize, String status, String orderNo, Long warehouseId) {
         LambdaQueryWrapper<StocktakeOrder> qw = new LambdaQueryWrapper<>();

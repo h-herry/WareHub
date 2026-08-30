@@ -13,6 +13,7 @@ import com.warehub.mapper.UserRoleMapper;
 import com.warehub.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final UserRoleMapper userRoleMapper;
     private final PasswordEncoder passwordEncoder;
 
+    @Value("${warehub.security.default-password:admin123}")
+    private String defaultPassword;
+
+    /** 用户分页查询（用户名/姓名/状态筛选），附带用户角色 ID 列表 */
     @Override
     public PageResult<Map<String, Object>> page(int pageNum, int pageSize, String username, String realName, Integer status) {
         LambdaQueryWrapper<User> qw = new LambdaQueryWrapper<>();
@@ -55,6 +60,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return new PageResult<>(page.getTotal(), records);
     }
 
+    /**
+     * 创建用户：校验用户名唯一，密码缺省用默认密码（BCrypt），并分配角色
+     *
+     * @param user    用户信息（用户名必填）
+     * @param roleIds 角色 ID 列表（可为空）
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createUser(User user, List<Long> roleIds) {
@@ -62,7 +73,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BizException("用户名已存在");
         }
         if (user.getPassword() == null || user.getPassword().isBlank()) {
-            user.setPassword(passwordEncoder.encode("123456"));
+            user.setPassword(passwordEncoder.encode(defaultPassword));
         } else {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
         }
@@ -71,6 +82,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         assignRoles(user.getId(), roleIds);
     }
 
+    /**
+     * 修改用户：仅更新非空字段（用户名变更时校验唯一），密码仅在提供时修改，并重分配角色
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateUser(Long id, User user, List<Long> roleIds) {
@@ -95,6 +109,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         assignRoles(id, roleIds);
     }
 
+    /** 重分配用户角色（先清空再插入，事务内保证一致性） */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void assignRoles(Long userId, List<Long> roleIds) {
@@ -106,15 +121,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
     }
 
+    /** 重置用户密码（未传新密码时重置为默认密码） */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void resetPassword(Long userId, String newPassword) {
         User user = getById(userId);
         if (user == null) throw new BizException("用户不存在");
-        user.setPassword(passwordEncoder.encode(newPassword != null ? newPassword : "admin123"));
+        user.setPassword(passwordEncoder.encode(newPassword != null && !newPassword.isBlank() ? newPassword : defaultPassword));
         updateById(user);
     }
 
+    /** 启用/停用用户（status：1 启用 / 0 停用） */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void toggleStatus(Long userId, Integer status) {

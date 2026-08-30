@@ -14,6 +14,13 @@
         @search="doSearch"
         @update:model-value="onInput"
       />
+      <ScanField
+        v-model="keyword"
+        label="物料编码"
+        placeholder="扫码或输入物料编码"
+        scan-type="bar"
+        @scan="onScanMaterial"
+      />
       <div class="mat-list">
         <van-empty v-if="!list.length" description="无匹配物料" :image-size="60" />
         <div
@@ -47,8 +54,10 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { showToast } from 'vant'
 import * as materialApi from '@/api/material'
 import { pageStock } from '@/api/stock'
+import ScanField from '@/components/ScanField.vue'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -134,6 +143,18 @@ function onInput() {
 function onSelect(m) {
   emit('select', m)
   emit('update:show', false)
+}
+
+// 扫码物料编码：自动检索，命中唯一物料直接选中
+async function onScanMaterial(code) {
+  keyword.value = code
+  await doSearch()
+  if (list.value.length === 1) {
+    showToast('已自动匹配物料')
+    onSelect(list.value[0])
+  } else if (list.value.length === 0) {
+    showToast('未找到匹配物料：' + code)
+  }
 }
 
 watch(

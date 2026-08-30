@@ -9,12 +9,24 @@
           <el-select v-model="query.businessType" placeholder="业务类型" clearable style="width: 160px">
             <el-option v-for="t in BIZ_TYPES" :key="t.value" :label="t.label" :value="t.value" />
           </el-select>
+          <el-select v-model="query.warehouseId" placeholder="仓库" clearable filterable style="width: 160px">
+            <el-option v-for="w in warehouseOptions" :key="w.id" :label="w.warehouseName" :value="w.id" />
+          </el-select>
           <el-input
             v-model="query.businessOrderNo"
             placeholder="单据编号"
             clearable
             style="width: 180px"
             @keyup.enter="handleSearch"
+          />
+          <el-switch
+            v-model="query.mine"
+            inline-prompt
+            active-text="我的单据"
+            inactive-text="全部"
+            :active-value="true"
+            :inactive-value="false"
+            style="margin: 0 4px"
           />
           <el-button type="primary" :icon="'Search'" @click="handleSearch">查询</el-button>
           <el-button :icon="'RefreshLeft'" @click="resetQuery">重置</el-button>
@@ -115,6 +127,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getAuditTodo, auditPass, auditReject } from '@/api/audit'
+import { getWarehousePage } from '@/api/inventory'
 
 const BIZ_TYPES = [
   { value: 'INBOUND', label: '入库单' },
@@ -131,7 +144,17 @@ const bizTag = (v) => {
 const list = ref([])
 const total = ref(0)
 const loading = ref(false)
-const query = reactive({ pageNum: 1, pageSize: 10, businessType: '', businessOrderNo: '' })
+const warehouseOptions = ref([])
+const query = reactive({ pageNum: 1, pageSize: 10, businessType: '', warehouseId: '', businessOrderNo: '', mine: false })
+
+async function loadWarehouseOptions() {
+  try {
+    const res = await getWarehousePage({ pageSize: 999 })
+    warehouseOptions.value = res.records || []
+  } catch (e) {
+    warehouseOptions.value = []
+  }
+}
 
 const dialogVisible = ref(false)
 const pass = ref(true)
@@ -146,7 +169,9 @@ async function loadData() {
       pageNum: query.pageNum,
       pageSize: query.pageSize,
       businessType: query.businessType || undefined,
-      businessOrderNo: query.businessOrderNo || undefined
+      warehouseId: query.warehouseId || undefined,
+      businessOrderNo: query.businessOrderNo || undefined,
+      mine: query.mine || undefined
     })
     list.value = res.records || (Array.isArray(res) ? res : [])
     total.value = res.total || list.value.length
@@ -163,7 +188,9 @@ function handleSearch() {
 }
 function resetQuery() {
   query.businessType = ''
+  query.warehouseId = ''
   query.businessOrderNo = ''
+  query.mine = false
   handleSearch()
 }
 function openAudit(row, isPass) {
@@ -195,7 +222,10 @@ async function submitAudit() {
   }
 }
 
-onMounted(() => loadData())
+onMounted(() => {
+  loadWarehouseOptions()
+  loadData()
+})
 </script>
 
 <style scoped>

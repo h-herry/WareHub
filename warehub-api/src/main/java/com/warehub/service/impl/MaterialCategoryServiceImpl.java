@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 public class MaterialCategoryServiceImpl extends ServiceImpl<MaterialCategoryMapper, MaterialCategory>
         implements MaterialCategoryService {
 
+    /** 物料分类树（按 sort 升序，递归组装 children） */
     @Override
     public List<Map<String, Object>> tree() {
         List<MaterialCategory> all = list(new LambdaQueryWrapper<MaterialCategory>().orderByAsc(MaterialCategory::getSort));

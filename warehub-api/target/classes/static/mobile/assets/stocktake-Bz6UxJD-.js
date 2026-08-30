@@ -1,1 +1,0 @@
-import{v as e}from"./index-DomDvkLp.js";function o(t){return e.post("/stocktake",t)}function u(t){return e.put(`/stocktake/submit/${t}`)}function k(t){return e.put(`/stocktake/execute/${t}`)}export{o as c,k as e,u as s};

@@ -32,6 +32,7 @@ public class AuditService {
     private final OutboundItemMapper outboundItemMapper;
     private final StockMapper stockMapper;
     private final com.warehub.service.OutboundService outboundService;
+    private final AuditNotificationService auditNotificationService;
 
     /** 审核通过 */
     @Transactional(rollbackFor = Exception.class)
@@ -53,6 +54,7 @@ public class AuditService {
         record.setAuditRemark(remark);
         record.setAuditTime(LocalDateTime.now());
         auditRecordMapper.insert(record);
+        auditNotificationService.pushTodoCount(todoCount()); // 审核通过 → 待办减少，实时推送
     }
 
     /** 审核驳回 */
@@ -69,6 +71,7 @@ public class AuditService {
         record.setAuditRemark(remark);
         record.setAuditTime(LocalDateTime.now());
         auditRecordMapper.insert(record);
+        auditNotificationService.pushTodoCount(todoCount()); // 审核驳回 → 待办减少，实时推送
     }
 
     private String nextStatusAfterPass(String businessType) {
@@ -127,13 +130,15 @@ public class AuditService {
         return c;
     }
 
-    /** 待办列表（分页+筛选） */
-    public PageResult<Map<String, Object>> todo(int pageNum, int pageSize, String businessType, String businessOrderNo) {
+    /** 待办列表（分页+筛选）。warehouseId：按仓库过滤；mine：只看当前用户创建的单据 */
+    public PageResult<Map<String, Object>> todo(int pageNum, int pageSize, String businessType,
+                                                String businessOrderNo, Long warehouseId, Boolean mine) {
+        boolean mineOnly = Boolean.TRUE.equals(mine);
         List<Map<String, Object>> all = new ArrayList<>();
-        if (businessType == null || "INBOUND".equals(businessType)) collectInbound(all, businessOrderNo);
-        if (businessType == null || "OUTBOUND".equals(businessType)) collectOutbound(all, businessOrderNo);
-        if (businessType == null || "TRANSFER".equals(businessType)) collectTransfer(all, businessOrderNo);
-        if (businessType == null || "STOCKTAKE".equals(businessType)) collectStocktake(all, businessOrderNo);
+        if (businessType == null || "INBOUND".equals(businessType)) collectInbound(all, businessOrderNo, warehouseId, mineOnly);
+        if (businessType == null || "OUTBOUND".equals(businessType)) collectOutbound(all, businessOrderNo, warehouseId, mineOnly);
+        if (businessType == null || "TRANSFER".equals(businessType)) collectTransfer(all, businessOrderNo, warehouseId, mineOnly);
+        if (businessType == null || "STOCKTAKE".equals(businessType)) collectStocktake(all, businessOrderNo, warehouseId, mineOnly);
         // 内存分页
         int total = all.size();
         int from = Math.min((pageNum - 1) * pageSize, total);
@@ -155,10 +160,12 @@ public class AuditService {
                 .collect(Collectors.toMap(Material::getId, m -> m.getMaterialName() != null ? m.getMaterialName() : "(未知)", (a, b) -> a));
     }
 
-    private void collectInbound(List<Map<String, Object>> result, String businessOrderNo) {
+    private void collectInbound(List<Map<String, Object>> result, String businessOrderNo, Long warehouseId, boolean mine) {
         LambdaQueryWrapper<InboundOrder> qw = new LambdaQueryWrapper<InboundOrder>()
                 .eq(InboundOrder::getStatus, com.warehub.common.constant.OrderStatus.PENDING_AUDIT)
-                .eq(businessOrderNo != null, InboundOrder::getOrderNo, businessOrderNo);
+                .eq(businessOrderNo != null, InboundOrder::getOrderNo, businessOrderNo)
+                .eq(warehouseId != null, InboundOrder::getWarehouseId, warehouseId)
+                .eq(mine, InboundOrder::getCreateBy, UserContext.getUsername());
         List<InboundOrder> orders = inboundOrderMapper.selectList(qw);
         if (orders.isEmpty()) return;
 
@@ -201,10 +208,12 @@ public class AuditService {
         }
     }
 
-    private void collectOutbound(List<Map<String, Object>> result, String businessOrderNo) {
+    private void collectOutbound(List<Map<String, Object>> result, String businessOrderNo, Long warehouseId, boolean mine) {
         LambdaQueryWrapper<OutboundOrder> qw = new LambdaQueryWrapper<OutboundOrder>()
                 .eq(OutboundOrder::getStatus, com.warehub.common.constant.OrderStatus.PENDING_AUDIT)
-                .eq(businessOrderNo != null, OutboundOrder::getOrderNo, businessOrderNo);
+                .eq(businessOrderNo != null, OutboundOrder::getOrderNo, businessOrderNo)
+                .eq(warehouseId != null, OutboundOrder::getWarehouseId, warehouseId)
+                .eq(mine, OutboundOrder::getCreateBy, UserContext.getUsername());
         List<OutboundOrder> orders = outboundOrderMapper.selectList(qw);
         if (orders.isEmpty()) return;
 
@@ -262,10 +271,13 @@ public class AuditService {
         }
     }
 
-    private void collectTransfer(List<Map<String, Object>> result, String businessOrderNo) {
+    private void collectTransfer(List<Map<String, Object>> result, String businessOrderNo, Long warehouseId, boolean mine) {
         LambdaQueryWrapper<TransferOrder> qw = new LambdaQueryWrapper<TransferOrder>()
                 .eq(TransferOrder::getStatus, com.warehub.common.constant.OrderStatus.PENDING_AUDIT)
-                .eq(businessOrderNo != null, TransferOrder::getOrderNo, businessOrderNo);
+                .eq(businessOrderNo != null, TransferOrder::getOrderNo, businessOrderNo)
+                .and(warehouseId != null, w -> w.eq(TransferOrder::getFromWarehouseId, warehouseId)
+                        .or().eq(TransferOrder::getToWarehouseId, warehouseId))
+                .eq(mine, TransferOrder::getCreateBy, UserContext.getUsername());
         List<TransferOrder> orders = transferOrderMapper.selectList(qw);
         if (orders.isEmpty()) return;
 
@@ -292,10 +304,12 @@ public class AuditService {
         }
     }
 
-    private void collectStocktake(List<Map<String, Object>> result, String businessOrderNo) {
+    private void collectStocktake(List<Map<String, Object>> result, String businessOrderNo, Long warehouseId, boolean mine) {
         LambdaQueryWrapper<StocktakeOrder> qw = new LambdaQueryWrapper<StocktakeOrder>()
                 .eq(StocktakeOrder::getStatus, com.warehub.common.constant.OrderStatus.PENDING_AUDIT)
-                .eq(businessOrderNo != null, StocktakeOrder::getOrderNo, businessOrderNo);
+                .eq(businessOrderNo != null, StocktakeOrder::getOrderNo, businessOrderNo)
+                .eq(warehouseId != null, StocktakeOrder::getWarehouseId, warehouseId)
+                .eq(mine, StocktakeOrder::getCreateBy, UserContext.getUsername());
         List<StocktakeOrder> orders = stocktakeOrderMapper.selectList(qw);
         if (orders.isEmpty()) return;
 

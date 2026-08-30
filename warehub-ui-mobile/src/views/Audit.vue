@@ -4,6 +4,14 @@
 
     <van-tabs v-model:active="active" sticky>
       <van-tab title="待办审核">
+        <div class="audit-filter">
+          <van-cell title="仓库" :value="warehouseName || '全部仓库'" is-link @click="showWh = true" />
+          <van-cell title="只看我的单据">
+            <template #right-icon>
+              <van-switch v-model="mineFlag" size="20" @change="loadTodo" />
+            </template>
+          </van-cell>
+        </div>
         <div class="audit-list">
           <van-pull-refresh v-model="todoRefresh" @refresh="loadTodo">
             <van-empty v-if="!todoLoading && !todoList.length" description="暂无待办" />
@@ -76,6 +84,15 @@
       </van-tab>
     </van-tabs>
 
+    <!-- 仓库筛选 -->
+    <SelectPopup
+      v-model:show="showWh"
+      title="选择仓库"
+      searchable
+      :options="warehouseOptions"
+      @select="onWh"
+    />
+
     <!-- 驳回意见弹窗 -->
     <van-dialog
       v-model:show="showReject"
@@ -98,14 +115,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { showToast, showSuccessToast } from 'vant'
 import * as auditApi from '@/api/audit'
+import * as warehouseApi from '@/api/warehouse'
 import { executeInbound } from '@/api/inbound'
 import { executeOutbound } from '@/api/outbound'
 import { executeTransfer } from '@/api/transfer'
 import { executeStocktake } from '@/api/stocktake'
 import { useAppStore } from '@/store/app'
+import { getToken } from '@/utils/request'
+import SelectPopup from '@/components/SelectPopup.vue'
 
 const appStore = useAppStore()
 
@@ -113,6 +133,13 @@ const active = ref(0)
 const todoList = ref([])
 const todoLoading = ref(false)
 const todoRefresh = ref(false)
+
+// 审核筛选：仓库 + 我的单据
+const warehouseId = ref('')
+const warehouseName = ref('')
+const mineFlag = ref(false)
+const showWh = ref(false)
+const warehouseOptions = ref([])
 
 const recordList = ref([])
 const recLoading = ref(false)
@@ -123,6 +150,9 @@ const recPage = ref(1)
 const showReject = ref(false)
 const rejectRemark = ref('')
 const currentItem = ref(null)
+
+let sse = null
+let pollTimer = null
 
 function bizType(type) {
   switch (type) {
@@ -139,16 +169,75 @@ function bizType(type) {
   }
 }
 
+async function loadWarehouses() {
+  try {
+    const res = await warehouseApi.pageWarehouse({ pageNum: 1, pageSize: 100 })
+    warehouseOptions.value = (res?.records || []).map((w) => ({
+      text: w.warehouseName,
+      value: w.id,
+      sub: w.warehouseCode || ''
+    }))
+  } catch (e) {
+    warehouseOptions.value = []
+  }
+}
+
+function onWh(opt) {
+  warehouseId.value = opt.value
+  warehouseName.value = opt.text
+  showWh.value = false
+  loadTodo()
+}
+
+function todoParams() {
+  const p = {}
+  if (warehouseId.value) p.warehouseId = warehouseId.value
+  if (mineFlag.value) p.mine = true
+  return p
+}
+
 async function loadTodo() {
   todoLoading.value = true
   try {
-    todoList.value = await auditApi.getTodo()
+    todoList.value = await auditApi.getTodo(todoParams())
     await appStore.refreshAuditTodo()
   } catch (e) {
     todoList.value = []
   } finally {
     todoLoading.value = false
     todoRefresh.value = false
+  }
+}
+
+// 实时推送：优先 SSE，不可用时降级为 15s 轮询
+function startRealtime() {
+  const token = getToken()
+  if (token && typeof EventSource !== 'undefined') {
+    try {
+      sse = new EventSource('/api/audit/stream?token=' + encodeURIComponent(token))
+      sse.onmessage = () => {
+        if (active.value === 0) loadTodo()
+      }
+      sse.onerror = () => {
+        // 连接异常时依靠轮询兜底
+      }
+    } catch (e) {
+      sse = null
+    }
+  }
+  pollTimer = setInterval(() => {
+    if (active.value === 0) loadTodo()
+  }, 15000)
+}
+
+function stopRealtime() {
+  if (sse) {
+    sse.close()
+    sse = null
+  }
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
   }
 }
 
@@ -241,14 +330,24 @@ function confirmReject() {
 }
 
 onMounted(() => {
+  loadWarehouses()
   loadTodo()
   loadRecord()
+  startRealtime()
+})
+
+onBeforeUnmount(() => {
+  stopRealtime()
 })
 </script>
 
 <style scoped>
 .audit-list {
   padding: 10px 12px 12px;
+}
+.audit-filter {
+  background: #fff;
+  border-bottom: 1px solid #f2f3f5;
 }
 .audit-card {
   background: #fff;

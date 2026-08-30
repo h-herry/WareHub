@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 @Service
 public class LocationServiceImpl extends ServiceImpl<LocationMapper, Location> implements LocationService {
 
+    /** 库位分页查询（仓库/库位名称筛选） */
     @Override
     public PageResult<Map<String, Object>> page(int pageNum, int pageSize, Long warehouseId, String locationName) {
         LambdaQueryWrapper<Location> qw = new LambdaQueryWrapper<>();

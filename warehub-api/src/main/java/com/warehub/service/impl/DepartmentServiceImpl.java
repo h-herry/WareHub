@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DepartmentServiceImpl extends ServiceImpl<DepartmentMapper, Department> implements DepartmentService {
 
+    /** 部门树（按 sort 升序，递归组装 children） */
     @Override
     public List<Map<String, Object>> tree() {
         List<Department> all = list(new LambdaQueryWrapper<Department>().orderByAsc(Department::getSort));
@@ -26,6 +27,7 @@ public class DepartmentServiceImpl extends ServiceImpl<DepartmentMapper, Departm
         return build(0L, childrenMap);
     }
 
+    /** 递归构建部门树节点 */
     private List<Map<String, Object>> build(Long parentId, Map<Long, List<Department>> childrenMap) {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Department d : childrenMap.getOrDefault(parentId, Collections.emptyList())) {

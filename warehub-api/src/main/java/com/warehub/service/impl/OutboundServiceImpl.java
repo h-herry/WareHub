@@ -39,6 +39,13 @@ public class OutboundServiceImpl implements OutboundService {
     @org.springframework.beans.factory.annotation.Value("${warehub.audit.outbound:true}")
     private boolean auditRequired;
 
+    /**
+     * 创建出库单（草稿状态）
+     * <p>自动生成单号，保存主单与明细，汇总计划数量写入总数量。</p>
+     *
+     * @param dto 出库单创建请求（含仓库、明细）
+     * @return 生成的出库单号
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String createOutbound(OutboundCreateDTO dto) {
@@ -66,6 +73,12 @@ public class OutboundServiceImpl implements OutboundService {
         return order.getOrderNo();
     }
 
+    /**
+     * 提交出库单：先校验库存充足，再草稿 → 待审核（或审核关闭时直接待出库）
+     *
+     * @param orderNo 出库单号或 ID
+     * @return 提交后的状态
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String submit(String orderNo) {
@@ -122,6 +135,11 @@ public class OutboundServiceImpl implements OutboundService {
         }
     }
 
+    /**
+     * 执行出库：校验状态为待出库后逐明细 FIFO 扣减库存并写流水，单据置为已完成
+     *
+     * @param orderNo 出库单号或 ID
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void execute(String orderNo) {
@@ -165,6 +183,7 @@ public class OutboundServiceImpl implements OutboundService {
         }
     }
 
+    /** 出库单分页查询（按状态/单号/仓库筛选），附带仓库名与明细（含物料名） */
     @Override
     public PageResult<Map<String, Object>> page(int pageNum, int pageSize, String status, String orderNo, Long warehouseId) {
         LambdaQueryWrapper<OutboundOrder> qw = new LambdaQueryWrapper<>();

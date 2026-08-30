@@ -25,6 +25,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
 
     private final RoleMenuMapper roleMenuMapper;
 
+    /** 角色分页查询（角色名模糊筛选） */
     @Override
     public PageResult<Map<String, Object>> page(int pageNum, int pageSize, String roleName) {
         LambdaQueryWrapper<Role> qw = new LambdaQueryWrapper<>();
@@ -41,6 +42,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         return new PageResult<>(page.getTotal(), records);
     }
 
+    /** 重分配角色菜单权限（先清空再插入，事务内保证一致性） */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void assignMenus(Long roleId, List<Long> menuIds) {

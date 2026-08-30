@@ -31,11 +31,15 @@ public class StockServiceImpl extends ServiceImpl<StockMapper, Stock> implements
     private final LocationMapper locationMapper;
     private final StockLogMapper stockLogMapper;
 
+    /**
+     * 获取库存记录，不存在则创建（零库存占位）
+     * <p>批次空白统一归一化为 "-"，使唯一键对无批次场景同样生效。</p>
+     */
     @Override
     public Stock getOrCreate(Long warehouseId, Long locationId, Long materialId, String batchNo) {
-        // 批次空白统一归一化为 "-"，使唯一键对无批次也生效（M-B4）
+        // 批次空白统一归一化为 "-"，使唯一键对无批次也生效（M-B4）；同时 trim 去除首尾空格
         boolean blank = (batchNo == null || batchNo.isBlank());
-        String normBatch = blank ? "-" : batchNo;
+        String normBatch = blank ? "-" : batchNo.trim();
         LambdaQueryWrapper<Stock> qw = new LambdaQueryWrapper<>();
         qw.eq(Stock::getWarehouseId, warehouseId).eq(Stock::getLocationId, locationId)
           .eq(Stock::getMaterialId, materialId).eq(Stock::getBatchNo, normBatch);
@@ -55,6 +59,14 @@ public class StockServiceImpl extends ServiceImpl<StockMapper, Stock> implements
         return stock;
     }
 
+    /**
+     * 增加库存（乐观锁更新 + 冲突重试），并记录入库流水
+     *
+     * @param qty          增加数量（正数）
+     * @param businessType 业务类型（如 PURCHASE_IN）
+     * @param orderNo      业务单号
+     * @param operator     操作人
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void increase(Long warehouseId, Long locationId, Long materialId, String batchNo,
@@ -66,6 +78,14 @@ public class StockServiceImpl extends ServiceImpl<StockMapper, Stock> implements
         updateWithVersionRetry(stock, qty, true, businessType, orderNo, operator);
     }
 
+    /**
+     * 减少库存（乐观锁更新 + 冲突重试），库存不足时抛出业务异常，并记录出库流水
+     *
+     * @param qty          减少数量（正数）
+     * @param businessType 业务类型（如 SALE_OUT）
+     * @param orderNo      业务单号
+     * @param operator     操作人
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void decrease(Long warehouseId, Long locationId, Long materialId, String batchNo,
@@ -86,7 +106,7 @@ public class StockServiceImpl extends ServiceImpl<StockMapper, Stock> implements
     /** 查询已有库存，不存在返回 null（decrease 不应创建脏记录，M-B5） */
     private Stock getExisting(Long warehouseId, Long locationId, Long materialId, String batchNo) {
         boolean blank = (batchNo == null || batchNo.isBlank());
-        String normBatch = blank ? "-" : batchNo;
+        String normBatch = blank ? "-" : batchNo.trim();
         LambdaQueryWrapper<Stock> qw = new LambdaQueryWrapper<>();
         qw.eq(Stock::getWarehouseId, warehouseId).eq(Stock::getLocationId, locationId)
           .eq(Stock::getMaterialId, materialId).eq(Stock::getBatchNo, normBatch);
@@ -123,6 +143,13 @@ public class StockServiceImpl extends ServiceImpl<StockMapper, Stock> implements
         throw new BizException("库存并发更新失败，请重试");
     }
 
+    /**
+     * 盘点调整：将库存调整为指定实盘数量（正差增加/负差减少），并记录盘点流水
+     *
+     * @param actualQty 实盘数量
+     * @param orderNo   盘点单号
+     * @param operator  操作人
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void adjustTo(Long warehouseId, Long locationId, Long materialId, String batchNo,
@@ -137,6 +164,7 @@ public class StockServiceImpl extends ServiceImpl<StockMapper, Stock> implements
         }
     }
 
+    /** 记录一条库存流水（change 正数记 IN、负数记 OUT） */
     private void recordLog(Stock stock, String businessType, String orderNo, BigDecimal change,
                            BigDecimal before, BigDecimal after, String operator) {
         StockLog log = new StockLog();
@@ -155,6 +183,7 @@ public class StockServiceImpl extends ServiceImpl<StockMapper, Stock> implements
         stockLogMapper.insert(log);
     }
 
+    /** 库存分页查询（物料名/仓库/库位筛选），附带物料、仓库、库位名称 */
     @Override
     public PageResult<Map<String, Object>> pageStock(int pageNum, int pageSize, String materialName,
                                                      Long warehouseId, Long locationId) {
@@ -199,6 +228,7 @@ public class StockServiceImpl extends ServiceImpl<StockMapper, Stock> implements
         return new PageResult<>((long) records.size(), records);
     }
 
+    /** 库存流水分页查询（物料/业务单号/变动类型筛选），附带物料、仓库、库位名称 */
     @Override
     public PageResult<Map<String, Object>> pageLog(int pageNum, int pageSize, Long materialId, String businessOrderNo, String changeType) {
         LambdaQueryWrapper<StockLog> qw = new LambdaQueryWrapper<>();
@@ -247,6 +277,7 @@ public class StockServiceImpl extends ServiceImpl<StockMapper, Stock> implements
         return new PageResult<>(page.getTotal(), records);
     }
 
+    /** 库存预警：低于安全库存记 LOW、高于最大库存记 OVER，附仓库/库位名称 */
     @Override
     public List<Map<String, Object>> warning() {
         // 取所有有库存的物料，对比安全库存/最大库存

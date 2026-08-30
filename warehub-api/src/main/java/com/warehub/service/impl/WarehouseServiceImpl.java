@@ -20,6 +20,7 @@ import java.util.Map;
 @Service
 public class WarehouseServiceImpl extends ServiceImpl<WarehouseMapper, Warehouse> implements WarehouseService {
 
+    /** 仓库分页查询（仓库名称模糊筛选） */
     @Override
     public PageResult<Map<String, Object>> page(int pageNum, int pageSize, String warehouseName) {
         LambdaQueryWrapper<Warehouse> qw = new LambdaQueryWrapper<>();

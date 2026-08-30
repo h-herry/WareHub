@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.Select;
  */
 public interface OutboundOrderMapper extends BaseMapper<OutboundOrder> {
 
+    /** 查询指定前缀下最大单号（用于流水号生成） */
     @Select("SELECT MAX(order_no) FROM wms_outbound_order WHERE order_no LIKE CONCAT(#{prefix}, '%')")
     String maxOrderNo(@Param("prefix") String prefix);
 }

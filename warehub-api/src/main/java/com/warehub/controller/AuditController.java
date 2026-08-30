@@ -5,12 +5,15 @@ import com.warehub.common.annotation.Log;
 import com.warehub.common.result.PageResult;
 import com.warehub.common.result.R;
 import com.warehub.entity.AuditRecord;
+import com.warehub.service.AuditNotificationService;
 import com.warehub.service.AuditService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
@@ -25,6 +28,7 @@ import java.util.Map;
 public class AuditController {
 
     private final AuditService auditService;
+    private final AuditNotificationService auditNotificationService;
 
     @Operation(summary = "待办列表（分页+筛选）")
     @HasPerm("audit:list")
@@ -32,8 +36,10 @@ public class AuditController {
     public R<PageResult<Map<String, Object>>> todo(@RequestParam(defaultValue = "1") int pageNum,
                                                     @RequestParam(defaultValue = "10") int pageSize,
                                                     @RequestParam(required = false) String businessType,
-                                                    @RequestParam(required = false) String businessOrderNo) {
-        return R.ok(auditService.todo(pageNum, pageSize, businessType, businessOrderNo));
+                                                    @RequestParam(required = false) String businessOrderNo,
+                                                    @RequestParam(required = false) Long warehouseId,
+                                                    @RequestParam(required = false) Boolean mine) {
+        return R.ok(auditService.todo(pageNum, pageSize, businessType, businessOrderNo, warehouseId, mine));
     }
 
     @Operation(summary = "审核通过")
@@ -69,5 +75,12 @@ public class AuditController {
         private String businessType;   // INBOUND/OUTBOUND/TRANSFER/STOCKTAKE
         private String businessOrderNo;
         private String auditRemark;
+    }
+
+    @Operation(summary = "审核待办实时推送（SSE）")
+    @HasPerm("audit:list")
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream() {
+        return auditNotificationService.subscribe();
     }
 }

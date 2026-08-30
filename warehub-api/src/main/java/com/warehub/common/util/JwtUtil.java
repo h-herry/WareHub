@@ -4,6 +4,7 @@ import com.warehub.common.security.LoginUser;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +29,21 @@ public class JwtUtil {
 
     @Value("${warehub.jwt.refresh-token-expiration:604800000}")
     private Long refreshExpiration;
+
+    /**
+     * 启动强校验：JWT 签名密钥长度必须 >= 32 字节（UTF-8）。
+     * 生产环境若通过环境变量 JWT_SECRET 注入过短密钥，启动即失败，避免弱密钥上线。
+     */
+    @PostConstruct
+    public void validateSecret() {
+        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length < 32) {
+            throw new IllegalStateException(
+                    "JWT 签名密钥长度不足 32 字节（当前 " + bytes.length
+                            + " 字节）。请通过环境变量 JWT_SECRET 配置 >=32 字节的强随机密钥，"
+                            + "否则存在 token 被伪造的安全风险。");
+        }
+    }
 
     private SecretKey getKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));

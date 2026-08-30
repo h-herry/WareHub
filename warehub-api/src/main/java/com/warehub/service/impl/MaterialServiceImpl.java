@@ -44,6 +44,7 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
     @Value("${warehub.material-code.type-codes.AUX:AUX}")
     private String auxCode;
 
+    /** 物料分页查询（名称/编码/分类/类型/状态筛选，条件可选） */
     @Override
     public PageResult<Material> pageMaterials(int pageNum, int pageSize, String materialName,
                                               String materialCode, Long categoryId, String materialType, Integer status) {
@@ -58,9 +59,10 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
         return new PageResult<>(page.getTotal(), page.getRecords());
     }
 
+    /** 物料分页查询（附带分类名称，供前端表格直接渲染） */
     @Override
     public PageResult<Map<String, Object>> pageMaterialMaps(int pageNum, int pageSize, String materialName,
-                                                              String materialCode, Long categoryId, String materialType, Integer status) {
+                                                            String materialCode, Long categoryId, String materialType, Integer status) {
         PageResult<Material> pr = pageMaterials(pageNum, pageSize, materialName, materialCode, categoryId, materialType, status);
         // 补充分类名称
         Set<Long> catIds = pr.getRecords().stream()
@@ -90,6 +92,13 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
         return new PageResult<>(pr.getTotal(), records);
     }
 
+    /**
+     * 按「分类编码-类型前缀-6 位流水」自动生成物料编码（线程安全）
+     *
+     * @param categoryId   物料分类 ID
+     * @param materialType 物料类型（RAW/SEM/FIN/AUX）
+     * @return 新物料编码
+     */
     @Override
     public synchronized String generateCode(Long categoryId, String materialType) {
         MaterialCategory category = categoryMapper.selectById(categoryId);
@@ -117,11 +126,13 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
         return prefix + String.format("%06d", seq);
     }
 
+    /** 判断物料编码是否已存在 */
     @Override
     public boolean existsByCode(String code) {
         return count(new LambdaQueryWrapper<Material>().eq(Material::getMaterialCode, code)) > 0;
     }
 
+    /** 按条码精确查询物料（扫码识别，空白条码返回 null） */
     @Override
     public Material getByBarcode(String barcode) {
         if (barcode == null || barcode.isBlank()) return null;
@@ -131,6 +142,7 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
         return getOne(qw);
     }
 
+    /** 导出全部物料为 Excel（9 列：编码/名称/简称/规格/单位/类型/安全库存/最大库存/状态） */
     @Override
     public void export(HttpServletResponse response) throws IOException {
         List<Material> list = list();
@@ -159,6 +171,12 @@ public class MaterialServiceImpl extends ServiceImpl<MaterialMapper, Material> i
         wb.close();
     }
 
+    /**
+     * 从 Excel 导入物料（首行表头，编码为空时自动生成，已存在编码跳过）
+     *
+     * @param file 上传的 xlsx 文件
+     * @return 成功导入条数
+     */
     @Override
     public int importExcel(MultipartFile file) throws IOException {
         try (Workbook wb = new XSSFWorkbook(file.getInputStream())) {

@@ -62,9 +62,11 @@ warehub:
     allowed-origins: "http://localhost:8080,http://localhost:5173"
   # JWT 配置
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET}   # 生产必须设置环境变量 JWT_SECRET（>=32字节）；缺失将启动失败（H6 修复）
     access-token-expiration: 7200000        # 2 小时
     refresh-token-expiration: 604800000     # 7 天
+  security:
+    default-password: "admin123"   # 新建/重置用户密码留空时的默认值；前端提示需与之保持一致（H8 修复）
   # 审核配置开关
   audit:
     inbound: true       # 入库是否需要审核
