@@ -1,0 +1,30 @@
+# ---------- Java / Maven ----------
+warehub-api/target/
+*.class
+
+# ---------- 日志 ----------
+logs/
+*.log
+*.log.*.gz
+
+# ---------- 前端构建产物与依赖 ----------
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# ---------- macOS ----------
+.DS_Store
+
+# ---------- IDE ----------
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# ---------- 本地工具数据 ----------
+.workbuddy/
+
+# ---------- 临时脚本 ----------
+e2e_verify_all.py
