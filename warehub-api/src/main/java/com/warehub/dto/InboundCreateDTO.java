@@ -30,7 +30,7 @@ public class InboundCreateDTO {
         @NotNull(message = "计划数量不能为空")
         @DecimalMin(value = "0", inclusive = false, message = "数量必须大于0")
         private BigDecimal planQuantity;
-        @NotNull(message = "实收数量不能为空")
+        /** 实收数量：开单时可为空，为空时自动取计划数量（执行环节回填真实收货量） */
         @DecimalMin(value = "0", inclusive = false, message = "数量必须大于0")
         private BigDecimal actualQuantity;
         private BigDecimal unitPrice;

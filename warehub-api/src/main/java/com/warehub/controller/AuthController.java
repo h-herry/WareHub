@@ -1,5 +1,6 @@
 package com.warehub.controller;
 
+import com.warehub.common.exception.BizException;
 import com.warehub.common.result.R;
 import com.warehub.common.security.LoginUser;
 import com.warehub.service.AuthService;
@@ -39,13 +40,28 @@ public class AuthController {
         return R.ok(data);
     }
 
+    /**
+     * 刷新令牌
+     * <p>兼容两种传参方式：① query 参数 ?refreshToken=xxx ② JSON body {"refreshToken":"xxx"}。</p>
+     * <p>PC 与移动端前端均使用 JSON body 方式，此处统一兼容，避免 token 过期后无法续期被强制登出。</p>
+     */
     @Operation(summary = "刷新令牌")
     @PostMapping("/refresh")
-    public R<Map<String, Object>> refresh(@RequestParam String refreshToken) {
-        LoginUser loginUser = authService.refresh(refreshToken);
+    public R<Map<String, Object>> refresh(@RequestParam(required = false) String refreshToken,
+                                          @RequestBody(required = false) Map<String, String> body) {
+        String token = (refreshToken != null && !refreshToken.isBlank()) ? refreshToken
+                : (body != null ? body.get("refreshToken") : null);
+        if (token == null || token.isBlank()) {
+            throw new BizException("刷新令牌不能为空");
+        }
+        LoginUser loginUser = authService.refresh(token);
         String accessToken = authService.generateAccessToken(loginUser);
+        String newRefreshToken = authService.generateRefreshToken(loginUser);
         Map<String, Object> data = new HashMap<>();
         data.put("accessToken", accessToken);
+        // 同时返回新的 refreshToken，供移动端续期（前端存在则覆盖存储）
+        data.put("refreshToken", newRefreshToken);
+        data.put("tokenType", "Bearer");
         data.put("user", loginUser);
         return R.ok(data);
     }

@@ -32,11 +32,19 @@ public class PermissionAspect {
             if (UserContext.get() == null) {
                 throw new BizException(401, "未登录或登录已过期");
             }
-            for (String perm : methodAnno.value()) {
-                if (!UserContext.hasPerm(perm)) {
-                    log.warn("权限不足: 需要 {}，当前用户 {}", perm, UserContext.getUsername());
-                    throw new BizException(403, "无权限: " + perm);
+            // 多权限码为「或」关系：拥有其中任意一个即放行。
+            // 用于兼容历史权限码（如调拨提交既接受 transfer:add，也接受 transfer:submit）。
+            String[] perms = methodAnno.value();
+            boolean passed = false;
+            for (String perm : perms) {
+                if (UserContext.hasPerm(perm)) {
+                    passed = true;
+                    break;
                 }
+            }
+            if (!passed) {
+                log.warn("权限不足: 需要 {} 之一，当前用户 {}", String.join(" / ", perms), UserContext.getUsername());
+                throw new BizException(403, "无权限: " + String.join(" 或 ", perms));
             }
         }
         return point.proceed();

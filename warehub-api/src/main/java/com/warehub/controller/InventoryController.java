@@ -238,7 +238,7 @@ public class InventoryController {
     }
 
     @Operation(summary = "提交调拨单")
-    @HasPerm("transfer:add")
+    @HasPerm({"transfer:add", "transfer:submit"})
     @Log(module = "调拨", operation = "提交调拨单")
     @PutMapping("/transfer/submit/{id}")
     public R<String> submitTransfer(@PathVariable String id) {
@@ -246,7 +246,7 @@ public class InventoryController {
     }
 
     @Operation(summary = "执行调拨")
-    @HasPerm("transfer:add")
+    @HasPerm({"transfer:add", "transfer:execute"})
     @Log(module = "调拨", operation = "执行调拨")
     @PutMapping("/transfer/execute/{id}")
     public R<Void> executeTransfer(@PathVariable String id) {
@@ -276,7 +276,7 @@ public class InventoryController {
     }
 
     @Operation(summary = "提交盘点单")
-    @HasPerm("stocktake:add")
+    @HasPerm({"stocktake:add", "stocktake:submit"})
     @Log(module = "盘点", operation = "提交盘点单")
     @PutMapping("/stocktake/submit/{id}")
     public R<String> submitStocktake(@PathVariable String id) {
@@ -284,7 +284,7 @@ public class InventoryController {
     }
 
     @Operation(summary = "执行盘点")
-    @HasPerm("stocktake:add")
+    @HasPerm({"stocktake:add", "stocktake:execute"})
     @Log(module = "盘点", operation = "执行盘点")
     @PutMapping("/stocktake/execute/{id}")
     public R<Void> executeStocktake(@PathVariable String id) {

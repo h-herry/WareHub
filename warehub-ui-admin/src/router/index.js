@@ -62,7 +62,8 @@ const routes = [
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/index.vue'),
-        meta: { title: '仪表盘', perm: 'dashboard' }
+        // 仪表盘为登录即可访问的首页：后端接口无权限码限制，此处不放行会导致非管理员登录后无法进入首页
+        meta: { title: '仪表盘' }
       },
       {
         path: 'material',
