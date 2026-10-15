@@ -25,7 +25,7 @@ public class WareHubApplication {
         System.out.println("   仓枢 WareHub 启动成功！");
         System.out.println("   PC 管理后台: " + base + "/");
         System.out.println("   移动 H5:     " + base + "/m");
-        System.out.println("   API 文档:    " + base + "/doc.html");
+        System.out.println("   API 文档:    " + base + "/swagger-ui.html");
         System.out.println("============================================");
     }
 }

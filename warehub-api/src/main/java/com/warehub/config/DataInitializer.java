@@ -1,6 +1,7 @@
 package com.warehub.config;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.warehub.common.constant.OrderStatus;
 import com.warehub.common.security.LoginUser;
 import com.warehub.entity.*;
 import com.warehub.mapper.*;
@@ -37,6 +38,13 @@ public class DataInitializer {
     private final WarehouseMapper warehouseMapper;
     private final LocationMapper locationMapper;
     private final StockMapper stockMapper;
+    private final InboundOrderMapper inboundOrderMapper;
+    private final InboundItemMapper inboundItemMapper;
+    private final OutboundOrderMapper outboundOrderMapper;
+    private final OutboundItemMapper outboundItemMapper;
+    private final TransferOrderMapper transferOrderMapper;
+    private final StocktakeOrderMapper stocktakeOrderMapper;
+    private final AuditRecordMapper auditRecordMapper;
 
     @Value("${spring.profiles.active:prod}")
     private String activeProfile;
@@ -56,6 +64,7 @@ public class DataInitializer {
         initAdmin();
         if ("h2".equals(activeProfile)) {
             initDemoData();
+            initRichDemoData();
         }
         log.info("仓枢 WareHub 基础数据初始化完成");
     }
@@ -308,6 +317,265 @@ public class DataInitializer {
             stock3.setUpdateTime(LocalDateTime.now());
             stockMapper.insert(stock3);
         }
+    }
+
+    /** 演示数据扩充：作业账号、物料、库存、四类单据 */
+    private void initRichDemoData() {
+        if (inboundOrderMapper.selectCount(null) > 0) {
+            log.info("演示业务单据已存在，跳过扩充");
+            return;
+        }
+        initDemoAccounts();
+        List<Long> materialIds = initDemoMaterials();
+        initDemoStocks();
+        initDemoOrders(materialIds);
+        log.info("演示数据扩充完成：8 个作业账号 / 50 物料 / 370 单据（5 待审 + 8 待执行）/ 4 条库存预警");
+    }
+
+    /** 演示账号：1 仓库主管 + 4 库管员 + 3 查询员，密码统一 admin123 */
+    private void initDemoAccounts() {
+        createAccount("manager1", "张伟", "13800000001", 2L);
+        String[] keepers = {"李强", "王芳", "刘洋", "陈静"};
+        for (int i = 0; i < keepers.length; i++) {
+            createAccount("keeper" + (i + 1), keepers[i], "1380000001" + i, 3L);
+        }
+        String[] viewers = {"赵敏", "孙悦", "周涛"};
+        for (int i = 0; i < viewers.length; i++) {
+            createAccount("query" + (i + 1), viewers[i], "1380000002" + i, 4L);
+        }
+    }
+
+    private void createAccount(String username, String realName, String phone, Long roleId) {
+        if (userMapper.selectCount(new LambdaQueryWrapper<User>().eq(User::getUsername, username)) > 0) {
+            return;
+        }
+        User u = new User();
+        u.setUsername(username);
+        u.setPassword(passwordEncoder.encode("admin123"));
+        u.setRealName(realName);
+        u.setPhone(phone);
+        u.setDeptId(1L);
+        u.setStatus(1);
+        userMapper.insert(u);
+        userRoleMapper.insert(new UserRole(null, u.getId(), roleId));
+    }
+
+    /** 物料补足到 50 个 */
+    private List<Long> initDemoMaterials() {
+        List<Long> ids = new ArrayList<>();
+        for (long id = 1001L; id <= 1003L; id++) {
+            ids.add(id);
+        }
+        String[] names = {"铝合金型材", "铜箔卷", "深沟球轴承", "直齿齿轮", "液压油", "O型密封圈",
+                "控制电缆", "中间继电器", "接近传感器", "标准气缸", "不锈钢管", "冷轧钢板",
+                "PVC管材", "伺服电机", "变频器", "气动阀", "步进电机", "线性导轨",
+                "同步带轮", "工业滤网", "切削刀具", "润滑脂", "接线端子", "断路器", "按钮开关"};
+        String[] types = {"RAW", "SEM", "FIN", "AUX", "PACK"};
+        String[] units = {"kg", "件", "套", "米", "个", "桶", "箱", "只"};
+        String[] specs = {"Φ20mm", "M12*50", "100*50*30", "DN25", "500ml", "2.5mm²", "24V", "0.75kW"};
+        for (int i = 4; i <= 50; i++) {
+            long mid = 1000L + i;
+            ids.add(mid);
+            String code = String.format("RM-%s-%06d", types[i % types.length], i);
+            if (materialMapper.selectCount(new LambdaQueryWrapper<Material>().eq(Material::getMaterialCode, code)) > 0) {
+                continue;
+            }
+            String base = names[(i - 4) % names.length];
+            Material mat = new Material();
+            mat.setId(mid);
+            mat.setMaterialCode(code);
+            mat.setMaterialName(base + "-" + String.format("%02d", (i - 4) / names.length + 1));
+            mat.setShortName(base);
+            mat.setCategoryId(1L);
+            mat.setSpec(specs[i % specs.length]);
+            mat.setUnit(units[i % units.length]);
+            mat.setMaterialType(types[i % types.length]);
+            mat.setSafetyStock(new BigDecimal(50 + (i % 5) * 20));
+            mat.setMaxStock(new BigDecimal(800 + (i % 7) * 100));
+            mat.setBarCode("69" + String.format("%011d", i));
+            mat.setStatus(1);
+            materialMapper.insert(mat);
+        }
+        return ids;
+    }
+
+    /** 库存：1004/1005/1006 三条低于安全库存，与既有 1002 合计 4 条预警 */
+    private void initDemoStocks() {
+        insertStock(1L, 1L, 1004L, "30");
+        insertStock(2L, 2L, 1005L, "20");
+        insertStock(1L, 3L, 1006L, "25");
+        for (int i = 7; i <= 40; i++) {
+            long mid = 1000L + i;
+            long wh = (i % 2 == 0) ? 1L : 2L;
+            long loc = (wh == 1L) ? ((i % 3 == 0) ? 3L : 1L) : 2L;
+            insertStock(wh, loc, mid, String.valueOf(200 + (i % 8) * 40));
+        }
+    }
+
+    private void insertStock(Long warehouseId, Long locationId, Long materialId, String qty) {
+        if (stockMapper.selectCount(new LambdaQueryWrapper<Stock>()
+                .eq(Stock::getWarehouseId, warehouseId).eq(Stock::getLocationId, locationId)
+                .eq(Stock::getMaterialId, materialId).eq(Stock::getBatchNo, "B20260801")) > 0) {
+            return;
+        }
+        Stock s = new Stock();
+        s.setWarehouseId(warehouseId);
+        s.setLocationId(locationId);
+        s.setMaterialId(materialId);
+        s.setBatchNo("B20260801");
+        s.setQuantity(new BigDecimal(qty));
+        s.setLockedQuantity(BigDecimal.ZERO);
+        s.setVersion(0);
+        s.setUpdateTime(LocalDateTime.now());
+        stockMapper.insert(s);
+    }
+
+    /** 单据：入库 100 / 出库 200 / 调拨 50 / 盘点 20（含 5 条待审核、8 条待执行） */
+    private void initDemoOrders(List<Long> materialIds) {
+        LocalDateTime now = LocalDateTime.now();
+        String[] inTypes = {"PURCHASE", "PRODUCTION", "RETURN"};
+        String[] outTypes = {"PICKUP", "SALE", "TRANSFER"};
+        String[] stTypes = {"CYCLE", "RANDOM", "FULL"};
+        int auditSeq = 0;
+
+        // 入库 100：2 待审 / 3 待执行 / 5 草稿 / 90 已完成
+        for (int i = 1; i <= 100; i++) {
+            String status = i <= 2 ? OrderStatus.PENDING_AUDIT
+                    : i <= 5 ? OrderStatus.PENDING_IN
+                    : i <= 10 ? OrderStatus.DRAFT : OrderStatus.COMPLETED;
+            BigDecimal qty = new BigDecimal(20 + (i % 15) * 10);
+            InboundOrder o = new InboundOrder();
+            o.setOrderNo(String.format("IN2026%05d", i));
+            o.setInboundType(inTypes[i % inTypes.length]);
+            o.setWarehouseId((i % 2 == 0) ? 1L : 2L);
+            o.setStatus(status);
+            o.setTotalQuantity(qty);
+            o.setRemark("演示入库单 #" + i);
+            if (OrderStatus.COMPLETED.equals(status)) {
+                o.setAuditUser("admin");
+                o.setAuditTime(now.minusDays(i % 30));
+                o.setAuditRemark("同意");
+            }
+            inboundOrderMapper.insert(o);
+            insertInboundItem(o.getId(), materialIds.get(i % materialIds.size()), qty);
+            if (OrderStatus.COMPLETED.equals(status) && auditSeq < 30) {
+                insertAuditRecord("INBOUND", o.getOrderNo(), now.minusDays(i % 30));
+                auditSeq++;
+            }
+        }
+
+        // 出库 200：2 待审 / 3 待执行 / 5 草稿 / 190 已完成
+        for (int i = 1; i <= 200; i++) {
+            String status = i <= 2 ? OrderStatus.PENDING_AUDIT
+                    : i <= 5 ? OrderStatus.PENDING_OUT
+                    : i <= 10 ? OrderStatus.DRAFT : OrderStatus.COMPLETED;
+            BigDecimal qty = new BigDecimal(10 + (i % 12) * 5);
+            OutboundOrder o = new OutboundOrder();
+            o.setOrderNo(String.format("OUT2026%05d", i));
+            o.setOutboundType(outTypes[i % outTypes.length]);
+            o.setWarehouseId((i % 2 == 0) ? 1L : 2L);
+            o.setStatus(status);
+            o.setTotalQuantity(qty);
+            o.setRemark("演示出库单 #" + i);
+            if (OrderStatus.COMPLETED.equals(status)) {
+                o.setAuditUser("admin");
+                o.setAuditTime(now.minusDays(i % 30));
+                o.setAuditRemark("同意");
+            }
+            outboundOrderMapper.insert(o);
+            insertOutboundItem(o.getId(), materialIds.get(i % materialIds.size()), qty);
+            if (OrderStatus.COMPLETED.equals(status) && auditSeq < 40) {
+                insertAuditRecord("OUTBOUND", o.getOrderNo(), now.minusDays(i % 30));
+                auditSeq++;
+            }
+        }
+
+        // 调拨 50：1 待审 / 2 待执行 / 2 草稿 / 45 已完成
+        for (int i = 1; i <= 50; i++) {
+            String status = i == 1 ? OrderStatus.PENDING_AUDIT
+                    : i <= 3 ? OrderStatus.PENDING
+                    : i <= 5 ? OrderStatus.DRAFT : OrderStatus.COMPLETED;
+            BigDecimal qty = new BigDecimal(15 + (i % 10) * 8);
+            TransferOrder o = new TransferOrder();
+            o.setOrderNo(String.format("TR2026%05d", i));
+            o.setFromWarehouseId(1L);
+            o.setToWarehouseId(2L);
+            o.setFromLocationId(1L);
+            o.setToLocationId(2L);
+            o.setStatus(status);
+            o.setTotalQuantity(qty);
+            o.setItems(String.format("[{\"materialId\":%d,\"batchNo\":\"B20260801\",\"quantity\":%s}]",
+                    materialIds.get(i % materialIds.size()), qty));
+            o.setRemark("演示调拨单 #" + i);
+            if (OrderStatus.COMPLETED.equals(status)) {
+                o.setAuditUser("admin");
+                o.setAuditTime(now.minusDays(i % 30));
+                o.setAuditRemark("同意");
+            }
+            transferOrderMapper.insert(o);
+        }
+
+        // 盘点 20：2 草稿 / 18 已完成
+        for (int i = 1; i <= 20; i++) {
+            String status = i <= 2 ? OrderStatus.DRAFT : OrderStatus.COMPLETED;
+            BigDecimal book = new BigDecimal(100 + (i % 9) * 20);
+            BigDecimal actual = book.add(new BigDecimal((i % 5) - 2));
+            StocktakeOrder o = new StocktakeOrder();
+            o.setOrderNo(String.format("PD2026%05d", i));
+            o.setWarehouseId((i % 2 == 0) ? 1L : 2L);
+            o.setStatus(status);
+            o.setStocktakeType(stTypes[i % stTypes.length]);
+            o.setBookQuantity(book);
+            o.setActualQuantity(actual);
+            o.setDiffQuantity(actual.subtract(book));
+            o.setItems(String.format(
+                    "[{\"materialId\":%d,\"batchNo\":\"B20260801\",\"locationId\":1,\"bookQuantity\":%s,\"actualQuantity\":%s}]",
+                    materialIds.get(i % materialIds.size()), book, actual));
+            o.setRemark("演示盘点单 #" + i);
+            if (OrderStatus.COMPLETED.equals(status)) {
+                o.setAuditUser("admin");
+                o.setAuditTime(now.minusDays(i % 30));
+                o.setAuditRemark("同意");
+            }
+            stocktakeOrderMapper.insert(o);
+        }
+    }
+
+    private void insertInboundItem(Long orderId, Long materialId, BigDecimal qty) {
+        InboundItem it = new InboundItem();
+        it.setOrderId(orderId);
+        it.setMaterialId(materialId);
+        it.setBatchNo("B20260801");
+        it.setLocationId(1L);
+        it.setPlanQuantity(qty);
+        it.setActualQuantity(qty);
+        it.setUnitPrice(new BigDecimal("12.50"));
+        it.setRemark("演示明细");
+        inboundItemMapper.insert(it);
+    }
+
+    private void insertOutboundItem(Long orderId, Long materialId, BigDecimal qty) {
+        OutboundItem it = new OutboundItem();
+        it.setOrderId(orderId);
+        it.setMaterialId(materialId);
+        it.setBatchNo("B20260801");
+        it.setLocationId(1L);
+        it.setPlanQuantity(qty);
+        it.setActualQuantity(qty);
+        it.setUnitPrice(new BigDecimal("18.00"));
+        it.setRemark("演示明细");
+        outboundItemMapper.insert(it);
+    }
+
+    private void insertAuditRecord(String businessType, String orderNo, LocalDateTime time) {
+        AuditRecord r = new AuditRecord();
+        r.setBusinessType(businessType);
+        r.setBusinessOrderNo(orderNo);
+        r.setAuditUser("admin");
+        r.setAuditResult(1);
+        r.setAuditRemark("演示审核意见：同意");
+        r.setAuditTime(time);
+        auditRecordMapper.insert(r);
     }
 
     private Menu m(Long id, Long parentId, String name, String perm, int type, String path, String icon, int sort) {

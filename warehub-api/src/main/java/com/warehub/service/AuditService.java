@@ -1,6 +1,8 @@
 package com.warehub.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehub.common.exception.BizException;
 import com.warehub.common.result.PageResult;
 import com.warehub.common.security.UserContext;
@@ -33,6 +35,7 @@ public class AuditService {
     private final StockMapper stockMapper;
     private final com.warehub.service.OutboundService outboundService;
     private final AuditNotificationService auditNotificationService;
+    private final ObjectMapper objectMapper;
 
     /** 审核通过 */
     @Transactional(rollbackFor = Exception.class)
@@ -282,11 +285,17 @@ public class AuditService {
         if (orders.isEmpty()) return;
 
         Set<Long> whIds = new HashSet<>();
+        Set<Long> matIds = new HashSet<>();
         for (TransferOrder to : orders) {
             if (to.getFromWarehouseId() != null) whIds.add(to.getFromWarehouseId());
             if (to.getToWarehouseId() != null) whIds.add(to.getToWarehouseId());
+            for (Map<String, Object> it : parseItems(to.getItems())) {
+                Object mid = it.get("materialId");
+                if (mid instanceof Number) matIds.add(((Number) mid).longValue());
+            }
         }
         Map<Long, String> whMap = warehouseNameMap(whIds);
+        Map<Long, String> matMap = materialNameMap(matIds);
 
         for (TransferOrder to : orders) {
             Map<String, Object> map = new LinkedHashMap<>();
@@ -298,8 +307,15 @@ public class AuditService {
             map.put("applicant", to.getCreateBy());
             map.put("remark", to.getRemark());
             map.put("createTime", to.getCreateTime());
-            // 调拨明细存储在 JSON 字段中（items），直接透传
-            map.put("items", to.getItems());
+            List<Map<String, Object>> items = new ArrayList<>();
+            for (Map<String, Object> it : parseItems(to.getItems())) {
+                Map<String, Object> im = new LinkedHashMap<>();
+                Object mid = it.get("materialId");
+                if (mid instanceof Number) im.put("materialName", matMap.getOrDefault(((Number) mid).longValue(), "(未知)"));
+                im.put("quantity", it.get("quantity"));
+                items.add(im);
+            }
+            map.put("items", items);
             result.add(map);
         }
     }
@@ -313,8 +329,17 @@ public class AuditService {
         List<StocktakeOrder> orders = stocktakeOrderMapper.selectList(qw);
         if (orders.isEmpty()) return;
 
-        Set<Long> whIds = orders.stream().map(StocktakeOrder::getWarehouseId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> whIds = new HashSet<>();
+        Set<Long> matIds = new HashSet<>();
+        for (StocktakeOrder so : orders) {
+            if (so.getWarehouseId() != null) whIds.add(so.getWarehouseId());
+            for (Map<String, Object> it : parseItems(so.getItems())) {
+                Object mid = it.get("materialId");
+                if (mid instanceof Number) matIds.add(((Number) mid).longValue());
+            }
+        }
         Map<Long, String> whMap = warehouseNameMap(whIds);
+        Map<Long, String> matMap = materialNameMap(matIds);
 
         for (StocktakeOrder so : orders) {
             Map<String, Object> map = new LinkedHashMap<>();
@@ -326,9 +351,25 @@ public class AuditService {
             map.put("applicant", so.getCreateBy());
             map.put("remark", so.getRemark());
             map.put("createTime", so.getCreateTime());
-            // 盘点明细存储在 JSON 字段中（items）
-            map.put("items", so.getItems());
+            List<Map<String, Object>> items = new ArrayList<>();
+            for (Map<String, Object> it : parseItems(so.getItems())) {
+                Map<String, Object> im = new LinkedHashMap<>();
+                Object mid = it.get("materialId");
+                if (mid instanceof Number) im.put("materialName", matMap.getOrDefault(((Number) mid).longValue(), "(未知)"));
+                items.add(im);
+            }
+            map.put("items", items);
             result.add(map);
+        }
+    }
+
+    /** 调拨/盘点的 items 在数据库里是 JSON 字符串，统一解析为对象数组供前端展示 */
+    private List<Map<String, Object>> parseItems(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {});
+        } catch (Exception e) {
+            return List.of();
         }
     }
 

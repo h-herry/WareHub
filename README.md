@@ -1,5 +1,7 @@
 # 仓枢 WareHub · 轻量化仓库管理系统
 
+![PC 管理后台仪表盘](docs/assets/01-dashboard.png)
+
 面向中小型企业的轻量化 WMS。**单体架构、一个 JAR 包部署、零中间件依赖**，覆盖物料、库存、人员、审核四大核心业务，PC 后台、移动 H5、微信小程序三端共用一套后端。
 
 ## 功能特性
@@ -10,6 +12,26 @@
 - **人员权限**：RBAC 权限模型（用户/角色/菜单/按钮权限码），路由级 + 接口级双重鉴权
 - **多端支持**：PC 管理后台、移动 H5（扫码作业/移动审批）、微信小程序（预留）
 - **开箱即用**：H2 演示模式零安装启动，自动建表并播种演示数据
+
+## 界面展示
+
+### PC 管理后台
+
+| 物料管理 | 入库单 |
+| --- | --- |
+| ![物料管理](docs/assets/02-material-list.png) | ![入库单](docs/assets/03-inbound-list.png) |
+| 用户管理 | 角色权限 |
+| ![用户管理](docs/assets/04-user-list.png) | ![角色权限](docs/assets/05-role-list.png) |
+| 待办审核 | 审核记录 |
+| ![待办审核](docs/assets/06-audit-todo.png) | ![审核记录](docs/assets/07-audit-record.png) |
+
+### 移动 H5
+
+| 首页 | 作业中心 |
+| --- | --- |
+| ![移动端首页](docs/assets/08-mobile-home.png) | ![作业中心](docs/assets/09-mobile-work.png) |
+| 移动审批 | 入库作业 |
+| ![移动审批](docs/assets/10-mobile-audit.png) | ![入库作业](docs/assets/11-mobile-inbound.png) |
 
 ## 技术栈
 
@@ -37,7 +59,7 @@ java -jar target/warehub-api-1.0.0.jar --spring.profiles.active=h2
 | --- | --- |
 | PC 管理后台 | http://localhost:8080/ |
 | 移动 H5 | http://localhost:8080/m |
-| API 文档 | http://localhost:8080/doc.html |
+| API 文档 | http://localhost:8080/swagger-ui.html |
 
 默认账号：`admin` / `admin123`
 
@@ -77,6 +99,7 @@ warehub/
 | --- | --- |
 | [设计文档](docs/设计文档.md) | 架构设计、模块设计、数据库设计、状态机、安全设计 |
 | [技术文档](docs/技术文档.md) | 技术栈、开发指南、构建部署、API 接口清单、配置说明 |
+| [上线检查清单](docs/上线检查清单.md) | 上线前逐项检查清单与 pro 环境部署准备说明 |
 
 ## 核心设计
 
